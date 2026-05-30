@@ -602,10 +602,25 @@ impl TomlConfigLoader {
         };
 
         let old_ns = config.get_network_identity();
-        config.set_network_identity(NetworkIdentity::new(
-            old_ns.network_name,
-            old_ns.network_secret.unwrap_or_default(),
-        ));
+
+        // Detect credential mode: secure_mode enabled + no network_secret in TOML
+        let is_credential = config
+            .get_secure_mode()
+            .map(|sm| sm.enabled)
+            .unwrap_or(false)
+            && old_ns
+                .network_secret
+                .as_deref()
+                .map_or(true, |s| s.is_empty());
+
+        if is_credential {
+            config.set_network_identity(NetworkIdentity::new_credential(old_ns.network_name));
+        } else {
+            config.set_network_identity(NetworkIdentity::new(
+                old_ns.network_name,
+                old_ns.network_secret.unwrap_or_default(),
+            ));
+        }
 
         Ok(config)
     }
